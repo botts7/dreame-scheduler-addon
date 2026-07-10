@@ -32,17 +32,12 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Read add-on version
-        id: v
-        run: echo "version=$(grep -m1 '^version:' dreame_scheduler/config.yaml | cut -d'\"' -f2)" >> "$GITHUB_OUTPUT"
-
       - name: Build and publish ${{ matrix.arch }}
         uses: home-assistant/builder@master
         with:
           args: |
             --${{ matrix.arch }}
-            --target dreame_scheduler
+            --target /data/dreame_scheduler
             --image "dreame_scheduler-{arch}"
             --docker-hub "ghcr.io/${{ github.repository_owner }}"
-            --version "${{ steps.v.outputs.version }}"
             --addon
