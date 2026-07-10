@@ -1,0 +1,48 @@
+name: Build add-on
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dreame_scheduler/**"
+      - ".github/workflows/builder.yaml"
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, amd64, armv7]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read add-on version
+        id: v
+        run: echo "version=$(grep -m1 '^version:' dreame_scheduler/config.yaml | cut -d'\"' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish ${{ matrix.arch }}
+        uses: home-assistant/builder@master
+        with:
+          args: |
+            --${{ matrix.arch }}
+            --target dreame_scheduler
+            --image "dreame_scheduler-{arch}"
+            --docker-hub "ghcr.io/${{ github.repository_owner }}"
+            --version "${{ steps.v.outputs.version }}"
+            --addon
