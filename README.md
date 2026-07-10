@@ -8,9 +8,9 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Home%20Assistant-Add--on-41BDF5" alt="HA add-on">
-  <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="version">
+  <img src="https://img.shields.io/github/v/release/botts7/dreame-scheduler-addon?label=version&color=blue&sort=semver" alt="version">
   <img src="https://img.shields.io/badge/arch-amd64%20%7C%20aarch64%20%7C%20armv7-lightgrey" alt="arch">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
+  <img src="https://img.shields.io/github/license/botts7/dreame-scheduler-addon?color=green" alt="license">
 </p>
 
 A GUI (behind ingress) for the
