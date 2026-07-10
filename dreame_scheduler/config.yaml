@@ -6,9 +6,6 @@ description: >
   per-room cleaning schedules, weekly whole-house guarantee, quiet mode and
   notifications, all from one panel.
 url: "https://github.com/botts7/dreame-scheduler-addon"
-# Prebuilt multi-arch images published to GHCR by the repo's build workflow, so
-# users install without compiling locally. {arch} is filled by the Supervisor.
-image: "ghcr.io/botts7/dreame_scheduler-{arch}"
 arch:
   - amd64
   - aarch64
