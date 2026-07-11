@@ -2,9 +2,27 @@
    DREAME SCHEDULER — "Drafting console"
    Blueprint-instrument design language: night-blue drafting
    sheet, fine grid, cyan ink, amber robot accents, technical
-   type (Chakra Petch display · Archivo body · Plex Mono micro).
+   type (Roboto · Roboto Mono — matching Home Assistant).
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
+/* Fonts are bundled locally (static/fonts/) rather than pulled from the
+   Google Fonts CDN: the ingress iframe is cross-origin to fonts.gstatic.com,
+   so the CDN is blocked and the UI silently fell back to a system font.
+   Roboto v51 / Roboto Mono ship as variable fonts, so one file covers all
+   weights. Served same-origin through ingress = always loads, incl. offline. */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('fonts/roboto.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('fonts/roboto-mono.woff2') format('woff2');
+}
 
 :root {
   --bg: #0a0e17;
