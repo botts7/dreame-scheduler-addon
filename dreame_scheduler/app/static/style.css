@@ -211,6 +211,7 @@ select[multiple] { min-height: 96px; }
 
 /* ------------------------------------------------ map tab: toolbar */
 .beta-tag { font-size: 8.5px; background: var(--amber-soft); color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); border-radius: 5px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; font-family: var(--font-m); }
+.room-warn { font-size: 9px; background: var(--amber-soft); color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); border-radius: 5px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; font-family: var(--font-m); }
 .map-toolbar { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
 .tg {
   display: flex; align-items: center; gap: 3px; padding: 15px 6px 5px; position: relative;

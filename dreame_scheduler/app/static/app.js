@@ -164,6 +164,24 @@ function renderPickers() {
     }));
     buildCombo(host, items, opt("notify_targets") || ["persistent_notification"], v => { OPTS.notify_targets = v; }, "Search notify targets…");
   });
+  // test-notification button — sends to the currently selected targets
+  const tnBtn = $("#test-notify-btn");
+  if (tnBtn && !tnBtn._wired) {
+    tnBtn._wired = true;
+    tnBtn.addEventListener("click", async () => {
+      const targets = OPTS.notify_targets || opt("notify_targets") || ["persistent_notification"];
+      const old = tnBtn.textContent;
+      tnBtn.disabled = true; tnBtn.textContent = "Sending…";
+      try {
+        const r = await api("api/ha/test_notify", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targets }),
+        });
+        tnBtn.textContent = (r && r.sent) ? "Sent!" : "No target set";
+      } catch (e) { tnBtn.textContent = "Failed — check targets"; }
+      setTimeout(() => { tnBtn.textContent = old; tnBtn.disabled = false; }, 2500);
+    });
+  }
 }
 
 // Combobox multi-select (adapted from the wallbox add-on): a compact field
@@ -259,12 +277,22 @@ function renderRooms() {
     const onCb = Object.assign(document.createElement("input"), { type: "checkbox", checked: rc.enabled !== false });
     onCb.setAttribute("aria-label", `Include ${name} in the schedule`);
     onCb.title = `Include ${name} in the schedule`;
-    onCb.addEventListener("change", () => { rc.enabled = onCb.checked; tr.classList.toggle("off", !onCb.checked); });
+    onCb.addEventListener("change", () => { rc.enabled = onCb.checked; tr.classList.toggle("off", !onCb.checked); refreshWarn(); });
     onTd.appendChild(onCb); tr.appendChild(onTd);
 
-    // name
+    // name (+ a warning when the room is on but has no days -> never cleans)
     const nameTd = document.createElement("td");
-    nameTd.className = "name"; nameTd.textContent = name; tr.appendChild(nameTd);
+    nameTd.className = "name";
+    const nameSpan = document.createElement("span"); nameSpan.textContent = name;
+    const warn = document.createElement("span");
+    warn.className = "room-warn"; warn.textContent = "no days";
+    warn.title = "This room is on but has no days selected — it will never be cleaned.";
+    nameTd.appendChild(nameSpan); nameTd.appendChild(warn); tr.appendChild(nameTd);
+    const refreshWarn = () => {
+      const blank = rc.enabled !== false && (!rc.days || rc.days.length === 0);
+      warn.style.display = blank ? "" : "none";
+    };
+    refreshWarn();
 
     // day checkboxes
     WEEK.forEach((_, i) => {
@@ -276,6 +304,7 @@ function renderRooms() {
         const s = new Set(rc.days || []);
         cb.checked ? s.add(i) : s.delete(i);
         rc.days = Array.from(s).sort((a, b) => a - b);
+        refreshWarn();
       });
       td.appendChild(cb); tr.appendChild(td);
     });

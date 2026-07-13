@@ -727,6 +727,30 @@ def call_service(cfg: CoreConfig, domain: str, service: str, entity_id: str, tim
         raise CoreError(f"{domain}.{service} HTTP {r.status_code}: {r.text[:200]}")
 
 
+def notify_test(cfg: CoreConfig, targets: list[str], timeout: float = 10.0) -> int:
+    """Send a test notification to the given notify targets so the user can
+    verify their channel renders correctly (icons/dashes). Returns count sent."""
+    _ensure(cfg)
+    valid = set(list_notify_services(cfg)) | {"persistent_notification"}
+    title = "🧹 Dreame Scheduler test"
+    message = "Notifications are working. If the ✅ 🟡 🔴 — icons look right, you're all set."
+    sent = 0
+    for raw in (targets or ["persistent_notification"]):
+        t = re.sub(r"[^a-z0-9_]", "", str(raw).lower())   # safe service name
+        if not t or t not in valid:
+            continue
+        try:
+            r = requests.post(
+                f"{cfg.base_url}/services/notify/{t}",
+                headers=_headers(cfg), json={"title": title, "message": message}, timeout=timeout,
+            )
+        except requests.RequestException as e:
+            raise CoreUnavailable(str(e)) from e
+        if r.status_code < 400:
+            sent += 1
+    return sent
+
+
 def get_state(cfg: CoreConfig, entity_id: str, timeout: float = 6.0) -> dict[str, Any]:
     """Current state of one entity (for live overlay refresh)."""
     _ensure(cfg)

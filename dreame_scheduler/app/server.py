@@ -190,6 +190,21 @@ def api_call_service():
         return jsonify(body), code
 
 
+@app.route("/api/ha/test_notify", methods=["POST"])
+def api_test_notify():
+    """Send a test notification to the configured targets so the user can
+    verify their notify channel renders correctly."""
+    cfg = ha_bridge.config_from_env()
+    p = request.get_json(silent=True) or {}
+    targets = p.get("targets") or ["persistent_notification"]
+    try:
+        sent = ha_bridge.notify_test(cfg, targets)
+        return jsonify({"ok": True, "sent": sent})
+    except Exception as e:  # noqa: BLE001
+        body, code = _ha_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/ha/state")
 def api_state():
     """Current state of a single entity (for live overlay refresh)."""
