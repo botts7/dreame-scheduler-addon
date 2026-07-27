@@ -380,7 +380,11 @@ async function save() {
 let _actionBusy = false;
 async function doAction(action, quiet, srcBtn) {
   if (_actionBusy) return;                            // no double-dispatch on a fast double-tap
-  if (action === "reset_week" && !confirm("Reset this week's cleaned/pending tracking and start a fresh week?")) return;
+  if (action === "reset_week" && !(await uiConfirm({
+    title: "Reset the week?",
+    message: "Reset this week's cleaned/pending tracking and start a fresh week?",
+    confirmText: "Reset week", danger: true,
+  }))) return;
   _actionBusy = true;
   const btns = $$(`[data-action="${action}"]`); btns.forEach(b => b.disabled = true);
   setStatus("Running " + action + "…");
@@ -3176,6 +3180,7 @@ function renderReport() {
     box.appendChild(row);
   });
 
+  renderManualClean();
   renderSuggestions();
   renderCoverage();
   renderObstacles();
@@ -3250,6 +3255,64 @@ function openContentModal(title, contentNode) {
   lb.classList.add("show");
 }
 
+// Styled in-app confirm — replaces the browser-native confirm() so dialogs
+// match the app (dark theme, real buttons). Promise-based:
+//   if (!(await uiConfirm({title, message}))) return;
+// opts: {title, message, confirmText, cancelText (null hides it), danger}
+function uiConfirm(opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    let lb = $("#confirmmodal");
+    if (!lb) {
+      lb = el("div", "lightbox"); lb.id = "confirmmodal";
+      lb.innerHTML =
+        '<div class="lb-inner confirm-inner">' +
+        '<div class="confirm-title"></div>' +
+        '<div class="confirm-msg"></div>' +
+        '<div class="confirm-actions">' +
+        '<button class="btn ghost confirm-cancel" type="button"></button>' +
+        '<button class="btn primary confirm-ok" type="button"></button>' +
+        "</div></div>";
+      document.body.appendChild(lb);
+    }
+    const ok = lb.querySelector(".confirm-ok");
+    const cancel = lb.querySelector(".confirm-cancel");
+    const onKey = (e) => {
+      if (e.key === "Escape") done(false);
+      else if (e.key === "Enter") done(true);
+    };
+    function done(val) {
+      lb.classList.remove("show");
+      document.removeEventListener("keydown", onKey);
+      resolve(val);
+    }
+    lb.querySelector(".confirm-title").textContent = opts.title || "Are you sure?";
+    const msg = lb.querySelector(".confirm-msg");
+    msg.textContent = "";                    // render \n as line breaks, text-safe
+    String(opts.message || "").split("\n").forEach((line, i) => {
+      if (i) msg.appendChild(document.createElement("br"));
+      msg.appendChild(document.createTextNode(line));
+    });
+    ok.textContent = opts.confirmText || "Confirm";
+    ok.classList.toggle("danger", !!opts.danger);
+    if (opts.cancelText === null) { cancel.style.display = "none"; }
+    else { cancel.style.display = ""; cancel.textContent = opts.cancelText || "Cancel"; }
+    ok.onclick = () => done(true);
+    cancel.onclick = () => done(false);
+    lb.onclick = (e) => { if (e.target === lb) done(false); };
+    document.addEventListener("keydown", onKey);
+    const root = document.fullscreenElement || document.querySelector(".card.map-fs") || document.body;
+    if (lb.parentNode !== root) root.appendChild(lb);
+    lb.classList.add("show");
+    setTimeout(() => ok.focus(), 30);
+  });
+}
+
+// Styled alert — single OK button, same look. Returns a Promise you can await.
+function uiAlert(message, title) {
+  return uiConfirm({ title: title || "", message, confirmText: "OK", cancelText: null });
+}
+
 function openMapModal(inner, caption) {
   let lb = $("#mapmodal");
   if (!lb) {
@@ -3282,6 +3345,16 @@ async function showObstacleOnMap(o) {
   drawFloorplan();
 }
 
+// Per-suggestion presentation: icon + severity class. Learner no-go suggestions
+// carry a `key` + `apply_service` and get an Apply button that writes the zone.
+const SUG_META = {
+  learned_nogo:  { ico: "🧠", cls: "sug-act" },
+  path_block:    { ico: "🧱", cls: "sug-warn" },
+  tidy_floor:    { ico: "🧹", cls: "sug-info" },
+  recurring_fail:{ ico: "🔴", cls: "sug-warn" },
+  move_day:      { ico: "📅", cls: "sug-info" },
+};
+
 function renderSuggestions() {
   const card = $("#report-suggestions-card");
   const box = $("#report-suggestions");
@@ -3290,12 +3363,200 @@ function renderSuggestions() {
   card.style.display = "block";
   box.innerHTML = "";
   sugs.forEach(s => {
-    const row = el("div", "sug-row " + (s.type === "recurring_fail" ? "sug-warn" : "sug-info"));
+    const m = SUG_META[s.type] || { ico: "💡", cls: "sug-info" };
+    const row = el("div", "sug-row " + m.cls);
     row.innerHTML =
-      '<span class="sug-ico">' + (s.type === "recurring_fail" ? "🔴" : "📅") + "</span>" +
+      '<span class="sug-ico">' + m.ico + "</span>" +
       '<span class="sug-msg">' + esc(s.message) + "</span>";
+    // The learner has enough evidence to place a permanent no-go here — offer it.
+    if (s.type === "learned_nogo" && s.key) {
+      const btn = el("button", "sug-apply");
+      btn.textContent = "⛔ Apply no-go";
+      btn.title = "Back up the map, then write a permanent no-go around this spot";
+      btn.addEventListener("click", () => applyLearnedNogo(s.key, btn));
+      row.appendChild(btn);
+    }
     box.appendChild(row);
   });
+}
+
+// Apply a learner-surfaced no-go through the integration (which owns the
+// evidence + the safe write): dreame_scheduler.apply_learned_nogo backs up the
+// map before writing. We just fire it and refresh so the suggestion clears.
+async function applyLearnedNogo(key, btn) {
+  if (!(await uiConfirm({
+    title: "Apply a permanent no-go?",
+    message: "The robot's map is backed up first, then a no-go zone sized from where it actually " +
+      "got stuck is written. You can remove it later in the Map tab.",
+    confirmText: "⛔ Apply no-go", danger: true,
+  }))) return;
+  if (btn) btn.disabled = true;
+  setStatus("Applying no-go…", "");
+  try {
+    await api("api/ha/action", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "apply_learned_nogo", data: _vacData({ key }) }),
+    });
+    setStatus("✓ No-go applied — the robot will route around it", "ok");
+    if (btn) btn.textContent = "✓ Applied";
+    setTimeout(loadReport, 1500);   // let the write land, then refresh the list
+  } catch (e) {
+    setStatus("Couldn’t apply no-go: " + e.message, "err");
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ---- Clean by hand (rooms the robot can't reach) ----
+function _vacData(extra) {
+  // Target THIS scheduler's vacuum so a multi-robot home acts on the right one.
+  const v = (REPORT && REPORT.robot && REPORT.robot.vacuum_entity) || null;
+  return Object.assign(v ? { vacuum: v } : {}, extra || {});
+}
+
+function _sinceLabel(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "since yesterday";
+  return "for " + days + " days";
+}
+
+function renderManualClean() {
+  const card = $("#report-manual-card");
+  const box = $("#report-manual");
+  const mapBtn = $("#manual-map-btn");
+  const mc = (REPORT && REPORT.manual_clean) || {};
+  const segs = Object.keys(mc);
+  // Always show the card so the feature is visible — even when everything's
+  // reachable, an all-clear state is reassuring (and tells you what would appear).
+  card.style.display = "block";
+  if (!segs.length) {
+    if (mapBtn) mapBtn.style.display = "none";
+    box.innerHTML = '<div class="mc-clear">✅ The robot is reaching every scheduled room — nothing needs a hand right now.</div>';
+    return;
+  }
+  if (mapBtn) mapBtn.style.display = "";
+  box.innerHTML = "";
+  segs.forEach(seg => {
+    const t = mc[seg] || {};
+    const name = t.name || ("Room " + seg);
+    const reason = t.reason || "the robot can’t reach it";
+    const since = _sinceLabel(t.added);
+    const row = el("div", "mc-row");
+    row.innerHTML =
+      '<span class="mc-ico">🧹</span>' +
+      '<span class="mc-main"><b>' + esc(name) + "</b>" +
+      '<span class="mc-sub">' + esc(reason) + (since ? " · " + esc(since) : "") + "</span></span>";
+    const acts = el("span", "mc-acts");
+
+    const show = el("button", "mc-btn mc-show");
+    show.innerHTML = "👉 Show me";
+    show.title = "The robot drives to this spot (silently, no cleaning) so you can see where it means";
+    show.addEventListener("click", () => showUnreachable(seg, name, show));
+    acts.appendChild(show);
+
+    const where = el("button", "mc-btn mc-where");
+    where.innerHTML = "📍 Where";
+    where.title = "Show this room on your floor plan";
+    where.addEventListener("click", () => showRoomModal(seg));
+    acts.appendChild(where);
+
+    const done = el("button", "mc-btn mc-done");
+    done.innerHTML = "✓ Done";
+    done.title = "I cleaned this by hand — credit it and drop it from the list";
+    done.addEventListener("click", () => manualDone(seg, name, done));
+    acts.appendChild(done);
+
+    row.appendChild(acts);
+    box.appendChild(row);
+  });
+}
+
+// Send the robot to the unreachable spot to physically point it out. Routed
+// through dreame_scheduler.show_unreachable (mutes volume, goes silent, no clean,
+// dwells, then restores) — a device action, so we confirm first.
+async function showUnreachable(seg, name, btn) {
+  if (!(await uiConfirm({
+    title: "Show you where " + name + " is?",
+    message: "The robot drives there silently (no cleaning, no beep), waits about a minute so you can " +
+      "see the spot, then carries on. Make sure its path is clear.",
+    confirmText: "👉 Show me",
+  }))) return;
+  if (btn) btn.disabled = true;
+  setStatus("Sending the robot to " + name + "…", "");
+  try {
+    await api("api/ha/action", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "show_unreachable", data: _vacData({ segment: String(seg) }) }),
+    });
+    setStatus("✓ On its way to " + name, "ok");
+    if (btn) { btn.innerHTML = "✓ On its way"; setTimeout(() => { btn.disabled = false; btn.innerHTML = "👉 Show me"; }, 8000); }
+  } catch (e) {
+    setStatus("Couldn’t send the robot: " + e.message, "err");
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function manualDone(seg, name, btn) {
+  if (btn) btn.disabled = true;
+  setStatus("Marking " + name + " cleaned…", "");
+  try {
+    await api("api/ha/manual_done", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix: CFG.prefix, segment: String(seg) }),
+    });
+    setStatus("✓ " + name + " cleaned by hand", "ok");
+    setTimeout(loadReport, 800);
+  } catch (e) {
+    setStatus("Couldn’t mark done: " + e.message, "err");
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Floor-plan modal that shades every clean-by-hand room red, with `focusSeg`
+// (if given) brightened and the view zoomed to it. Reuses the obstacle modal's
+// map data + coordinate transform.
+async function showRoomModal(focusSeg) {
+  const md = await _ensureMapData();
+  if (!md) { setStatus("Floor plan not available yet", "err"); return; }
+  const mc = (REPORT && REPORT.manual_clean) || {};
+  const sx = x => x - md.minX, sy = y => md.maxY - y;
+  const fs = Math.max(240, Math.round(Math.min(md.maxX - md.minX, md.maxY - md.minY) / 26));
+
+  // Default view = whole plan; if focusing a room, zoom to its bbox + margin.
+  let vb = `${0} ${0} ${md.maxX - md.minX} ${md.maxY - md.minY}`;
+  const focus = focusSeg != null
+    ? md.rooms.find(r => String(r.room_id) === String(focusSeg)) : null;
+  if (focus) {
+    const pad = 1400;
+    const x = sx(focus.x0) - pad, y = sy(focus.y1) - pad;
+    const w = (focus.x1 - focus.x0) + pad * 2, h = (focus.y1 - focus.y0) + pad * 2;
+    vb = `${x} ${y} ${w} ${h}`;
+  }
+
+  let svg = `<svg viewBox="${vb}" preserveAspectRatio="xMidYMid meet" class="floorplan">`;
+  md.rooms.forEach(r => {
+    const x = sx(r.x0), y = sy(r.y1), w = r.x1 - r.x0, h = r.y1 - r.y0;
+    const isManual = Object.prototype.hasOwnProperty.call(mc, String(r.room_id));
+    const isFocus = focus && String(r.room_id) === String(focusSeg);
+    const base = _PALETTE[(r.color_index || 0) % _PALETTE.length];
+    const color = isManual ? "#ef4444" : base;
+    const fillOp = isManual ? (isFocus ? 0.34 : 0.2) : 0.1;
+    const name = r.custom_name || r.name || ("Room " + r.room_id);
+    const cx = typeof r.x === "number" ? sx(r.x) : x + w / 2;
+    const cy = typeof r.y === "number" ? sy(r.y) : y + h / 2;
+    svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="80" fill="${color}" fill-opacity="${fillOp}" stroke="${color}" stroke-width="${isFocus ? 75 : 45}"${isManual ? ' class="fp-manual"' : ""}/>`
+      + `<text x="${cx}" y="${cy}" font-size="${fs}" class="fp-label">${esc(name)}</text>`
+      + (isManual ? `<text x="${cx}" y="${cy + fs * 1.25}" font-size="${fs}" class="fp-icon">🧹</text>` : "");
+  });
+  svg += "</svg>";
+  const n = Object.keys(mc).length;
+  const cap = focus
+    ? ((focus.custom_name || focus.name || ("Room " + focusSeg)) + " · clean by hand")
+    : (n + (n === 1 ? " room" : " rooms") + " to clean by hand");
+  openMapModal(svg, cap);
 }
 
 let _covObserver = null;
@@ -3413,9 +3674,12 @@ function renderObstacles() {
 // writes back (backing up the robot's map first).
 async function addObstacleNoGo(x, y, label, btn) {
   const HALF = 300; // 30cm half-box
-  if (!confirm("Create a no-go zone around " + label + " (" + x + "," + y + ")?\n\n" +
-    "The robot's map is BACKED UP first, then a ~60cm no-go box is added to your existing zones. " +
-    "It stays until you remove it in the Map tab.")) return;
+  if (!(await uiConfirm({
+    title: "Create a no-go zone here?",
+    message: "Around " + label + " (" + x + "," + y + "). The robot's map is backed up first, then a " +
+      "~60cm no-go box is added to your existing zones. It stays until you remove it in the Map tab.",
+    confirmText: "⛔ Create no-go", danger: true,
+  }))) return;
   if (btn) btn.disabled = true;
   setStatus("Adding no-go zone…", "");
   try {
@@ -3447,6 +3711,8 @@ $("#report-obstacles").addEventListener("click", (e) => {
   const b = e.target.closest(".obs-nogo"); if (!b) return;
   addObstacleNoGo(parseInt(b.dataset.x, 10), parseInt(b.dataset.y, 10), b.dataset.lbl, b);
 });
+
+$("#manual-map-btn").addEventListener("click", () => showRoomModal(null));
 
 // nav (mobile: ☰ collapses the tabs into a stacked menu)
 document.addEventListener("click", (e) => {

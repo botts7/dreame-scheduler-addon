@@ -522,8 +522,30 @@ footer {
 .sug-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--elevated); font-size: 13px; }
 .sug-row.sug-warn { border-color: rgba(244,98,110,.4); background: rgba(244,98,110,.09); }
 .sug-row.sug-info { border-color: var(--accent-border); background: var(--accent-soft); }
+.sug-row.sug-act { border-color: rgba(244,98,110,.45); background: rgba(244,98,110,.11); align-items: center; }
 .sug-ico { flex: 0 0 auto; font-size: 15px; line-height: 1.3; }
 .sug-msg { flex: 1 1 auto; }
+.sug-apply { flex: 0 0 auto; border: 1px solid rgba(244,98,110,.55); background: rgba(244,98,110,.16); color: #f4626e; border-radius: 999px; padding: 5px 13px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.sug-apply:hover { background: #f4626e; color: #fff; }
+.sug-apply:disabled { opacity: .6; cursor: default; }
+
+/* ---- clean by hand ---- */
+.report-manual { display: flex; flex-direction: column; }
+.mc-clear { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+.mc-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+.mc-row:last-child { border-bottom: 0; }
+.mc-ico { flex: 0 0 auto; width: 30px; text-align: center; font-size: 17px; }
+.mc-main { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.mc-sub { color: var(--muted); font-size: 12px; }
+.mc-acts { flex: 0 0 auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.mc-btn { border: 1px solid var(--border); background: var(--elevated); color: var(--text); border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.mc-btn:hover { border-color: var(--accent-border); color: var(--accent); }
+.mc-btn:disabled { opacity: .6; cursor: default; }
+.mc-show { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-cyan); }
+.mc-show:hover { background: var(--accent); color: var(--accent-fg); }
+.mc-done:hover { border-color: rgba(80,200,120,.6); color: #35c169; }
+.fp-manual { animation: mcpulse 1.6s ease-in-out infinite; }
+@keyframes mcpulse { 0%,100% { fill-opacity: .16; } 50% { fill-opacity: .30; } }
 
 /* ---- run history (Insights) ---- */
 .ih-list { display: flex; flex-direction: column; }
@@ -687,6 +709,24 @@ footer {
 }
 
 /* lightbox */
+/* themed scrollbars — the OS-default light bar clashes with the dark app.
+   Uses --border/--muted so it adapts to light theme too. */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* styled confirm / alert modal — replaces the browser-native dialogs */
+.confirm-inner { width: min(94vw, 440px); background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 20px 60px -12px rgba(0,0,0,.7); padding: 22px 22px 18px; align-items: stretch; gap: 0; }
+.confirm-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.confirm-msg { font-size: 13.5px; line-height: 1.5; color: var(--muted); margin-bottom: 18px; white-space: normal; }
+.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.confirm-actions .btn { min-width: 92px; }
+.confirm-ok.danger { background: #f4626e; border-color: #f4626e; color: #fff; }
+.confirm-ok.danger:hover { background: #e24a57; border-color: #e24a57; }
+
 .lightbox { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; background: rgba(2, 6, 16, .85); padding: 24px; }
 .lightbox.show { display: flex; }
 .lb-inner { position: relative; max-width: 96vw; max-height: 94vh; display: flex; flex-direction: column; align-items: center; gap: 10px; }

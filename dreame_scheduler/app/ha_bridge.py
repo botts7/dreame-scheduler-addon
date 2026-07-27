@@ -51,7 +51,8 @@ def _safe_entity(entity_id: str) -> str:
 # door contact sensors (binary_sensor). Keeps the /states payload small.
 _PICKER_DOMAINS = ("person", "device_tracker", "group", "binary_sensor")
 
-_ACTIONS = ("run_scheduled_now", "run_catchup_now", "reset_week")
+_ACTIONS = ("run_scheduled_now", "run_catchup_now", "reset_week",
+            "apply_learned_nogo", "show_unreachable")
 
 
 @dataclass(frozen=True)
@@ -689,6 +690,44 @@ def call_action(cfg: CoreConfig, action: str, data: dict | None = None, timeout:
         raise CoreUnavailable(str(e)) from e
     if r.status_code >= 400:
         raise CoreError(f"{action} HTTP {r.status_code}: {r.text[:200]}")
+
+
+def _find_manual_todo(cfg: CoreConfig, prefix: str, timeout: float = 8.0) -> str | None:
+    """The integration's own 'clean by hand' to-do entity for this vacuum. Its
+    entity_id embeds the prefix + 'clean_by_hand'; match on both so a multi-robot
+    home ticks the right list."""
+    prefix = _safe_prefix(prefix)
+    try:
+        r = requests.get(f"{cfg.base_url}/states", headers=_headers(cfg), timeout=timeout)
+    except requests.RequestException as e:
+        raise CoreUnavailable(str(e)) from e
+    r.raise_for_status()
+    for s in r.json():
+        eid = s.get("entity_id", "")
+        if eid.startswith("todo.") and "clean_by_hand" in eid and prefix in eid:
+            return eid
+    return None
+
+
+def manual_done(cfg: CoreConfig, prefix: str, seg, timeout: float = 10.0) -> None:
+    """Mark a 'clean by hand' room done from the GUI — the same as ticking it in
+    HA's to-do panel. Credits the room as cleaned and drops it from the list (the
+    integration's async_manual_room_done, reached via todo.update_item). Matched
+    by the item's stable uid (seg_<n>), not its wording, so it can't drift."""
+    _ensure(cfg)
+    eid = _find_manual_todo(cfg, prefix)
+    if not eid:
+        raise CoreError("clean-by-hand to-do entity not found for this vacuum")
+    body = {"entity_id": eid, "item": f"seg_{int(seg)}", "status": "completed"}
+    try:
+        r = requests.post(
+            f"{cfg.base_url}/services/todo/update_item",
+            headers=_headers(cfg), json=body, timeout=timeout,
+        )
+    except requests.RequestException as e:
+        raise CoreUnavailable(str(e)) from e
+    if r.status_code >= 400:
+        raise CoreError(f"manual_done HTTP {r.status_code}: {r.text[:200]}")
 
 
 # Allow-list of control services the floor-plan overlays may call, per domain.

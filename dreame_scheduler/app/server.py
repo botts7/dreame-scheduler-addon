@@ -412,6 +412,24 @@ def api_apply_segment_ops():
         _segops_lock.release()
 
 
+@app.route("/api/ha/manual_done", methods=["POST"])
+def api_manual_done():
+    """Tick a 'clean by hand' room off from the Insights view — credits the room
+    and drops it from the list (same as ticking it in HA's to-do panel)."""
+    cfg = ha_bridge.config_from_env()
+    p = request.get_json(silent=True) or {}
+    prefix = (p.get("prefix") or "").strip()
+    seg = p.get("segment")
+    if not prefix or seg is None:
+        return jsonify({"error": "bad_request", "detail": "prefix, segment required"}), 400
+    try:
+        ha_bridge.manual_done(cfg, prefix, seg)
+        return jsonify({"ok": True})
+    except Exception as e:  # noqa: BLE001
+        body, code = _ha_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/ha/action", methods=["POST"])
 def api_action():
     cfg = ha_bridge.config_from_env()
