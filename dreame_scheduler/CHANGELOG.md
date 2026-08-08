@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- Paired integration 0.2.2 fixes a `return_to_base` loop that could fire
+  repeatedly while the dock washed the robot's mop pads (a wash cycle reports as
+  "cleaning" even though the robot never left the dock). No add-on-side changes.
+
 ## 0.2.1
 
 - New **"Honor native per-room settings"** toggle (General) — on by default; the
