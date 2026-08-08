@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1
+
+- New **"Honor native per-room settings"** toggle (General) — on by default; the
+  scheduler respects the per-room mode / mop / suction you set in the Dreame app
+  (so a sweep-only carpet room is never force-mopped).
+- Paired integration 0.2.1: honor-native default, plus clearer self-resolving
+  stuck alerts — wheel-motor faults ask you to check the wheels, honest "stuck"
+  vs "beached" wording, an "✅ all clear" follow-up once it's back on the dock,
+  and a new "can't get home" watchdog that spots a robot circling / repositioning
+  but not actually making progress back to the dock (manual runs included).
+
 ## 0.2.0
 
 Companion release to the Dreame Scheduler **integration 0.2.0**.
