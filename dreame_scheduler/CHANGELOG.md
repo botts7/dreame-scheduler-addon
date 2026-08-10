@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+- Paired integration 0.2.3: tangle-aware recovery — a cable/cord tangle now gets
+  one gentle reverse and then a clear "🪢 please free it by hand" alert, instead
+  of repeatedly reversing (which just drags the tangle around). No add-on-side
+  changes.
+
 ## 0.2.2
 
 - Paired integration 0.2.2 fixes a `return_to_base` loop that could fire
