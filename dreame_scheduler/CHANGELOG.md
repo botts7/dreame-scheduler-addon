@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- New **"Alert when a wear-part runs low"** toggle and **threshold %** field
+  (Notifications) — paired integration 0.3.0 warns when the filter, brushes, mop
+  pad, sensors, detergent or silver-ion module runs low, with one-tap Reset/Dismiss.
+
 ## 0.2.3
 
 - Paired integration 0.2.3: tangle-aware recovery — a cable/cord tangle now gets
