@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Paired integration 0.3.1: a dock/station fault (e.g. "mop install failed" — the
+  robot can't mount its mop pads) now gets a clear "check the mop pads" alert and
+  ends the run, instead of leaving it wedged. No add-on-side changes.
+
 ## 0.3.0
 
 - New **"Alert when a wear-part runs low"** toggle and **threshold %** field
