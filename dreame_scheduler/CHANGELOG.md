@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2
+
+- Paired integration 0.3.2: after a station fault ("mop install failed") the
+  scheduler now stops the robot's task (so the firmware can't auto-resume the
+  failing mop job) and doesn't auto-retry — the rooms wait for the weekly
+  catch-up instead of re-blocking every day. No add-on-side changes.
+
 ## 0.3.1
 
 - Paired integration 0.3.1: a dock/station fault (e.g. "mop install failed" — the
