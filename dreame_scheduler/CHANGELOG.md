@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.4
+
+- Paired integration 0.3.4: the "can't get home" watchdog now only watches the
+  return trip, so it no longer false-fires mid-clean during long runs (an
+  auto-reclean pass made the progress counters look stalled). No add-on changes.
+
+## 0.3.3
+
+- New **Maintenance** card on the Report tab: remaining life of every wear part
+  (filter, brushes, mop pad, sensors, detergent, silver-ion) with a one-tap
+  **Reset** button per part (presses the robot's own reset once you've replaced
+  it). Paired integration 0.3.3 provides the per-part life + reset entity.
+
 ## 0.3.2
 
 - Paired integration 0.3.2: after a station fault ("mop install failed") the

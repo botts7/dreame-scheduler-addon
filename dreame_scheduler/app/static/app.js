@@ -3182,8 +3182,63 @@ function renderReport() {
 
   renderManualClean();
   renderSuggestions();
+  renderConsumables();
   renderCoverage();
   renderObstacles();
+}
+
+// Maintenance / wear-part panel: each consumable's remaining life + a one-tap
+// Reset (presses the robot's own reset button once the part's been replaced).
+function renderConsumables() {
+  const card = $("#report-consumables-card");
+  const box = $("#report-consumables");
+  if (!card || !box) return;
+  const items = (REPORT && REPORT.robot && REPORT.robot.consumables) || [];
+  if (!items.length) { card.style.display = "none"; return; }
+  card.style.display = "";
+  box.innerHTML = "";
+  items.forEach(c => {
+    const pct = Math.max(0, Math.min(100, Number(c.percent) || 0));
+    const low = !!c.low;
+    const row = el("div", "crow" + (low ? " low" : ""));
+    row.innerHTML =
+      '<span class="cemoji">' + esc(c.emoji || "🔧") + '</span>'
+      + '<div class="cmain">'
+      + '<div class="cname">' + esc(c.name) + (low ? ' <span class="pill cpill-low">low</span>' : '') + '</div>'
+      + '<div class="cbar"><i style="width:' + pct + '%"></i></div>'
+      + '</div>'
+      + '<span class="cpct">' + pct + '%</span>';
+    const btn = el("button", "btn ghost creset");
+    btn.type = "button";
+    btn.textContent = "Reset";
+    if (!c.reset_entity) { btn.disabled = true; btn.title = "No reset control for this part"; }
+    btn.addEventListener("click", () => resetConsumable(c, btn));
+    row.appendChild(btn);
+    box.appendChild(row);
+  });
+}
+
+async function resetConsumable(c, btn) {
+  if (!c.reset_entity) return;
+  if (!(await uiConfirm({
+    title: "Reset " + c.name + "?",
+    message: "Only do this once you've actually replaced the " + c.name.toLowerCase()
+      + " — it resets the robot's life counter back to 100%.",
+    confirmText: "Reset counter",
+  }))) return;
+  btn.disabled = true; const was = btn.textContent; btn.textContent = "…";
+  try {
+    await api("api/ha/service", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain: "button", service: "press", entity_id: c.reset_entity }),
+    });
+    setStatus(c.name + " counter reset ✓", "ok");
+    REPORT = null;                 // force a fresh pull so the % updates
+    await loadReport();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = was;
+    setStatus("Reset failed: " + (e && e.message ? e.message : e), "err");
+  }
 }
 
 // Floor-plan data for the obstacle modal (reuse the Map tab's if it's loaded,

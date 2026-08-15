@@ -475,6 +475,20 @@ footer {
 .report-rooms { display: flex; flex-direction: column; }
 .rrow { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
 .rrow:last-child { border-bottom: 0; }
+
+/* Maintenance / wear-part panel */
+.report-consumables { display: flex; flex-direction: column; }
+.crow { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.crow:last-child { border-bottom: 0; }
+.cemoji { font-size: 18px; width: 22px; text-align: center; }
+.cmain { min-width: 0; }
+.cname { font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.cbar { margin-top: 5px; height: 6px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); overflow: hidden; }
+.cbar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.crow.low .cbar i { background: #e0655b; }
+.cpct { font-family: var(--font-m); font-size: 13px; color: var(--muted); min-width: 38px; text-align: right; }
+.cpill-low { background: #e0655b; border-color: #e0655b; color: #fff; }
+.creset { padding: 6px 12px; font-size: 12.5px; }
 .rbadge { font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 6px; white-space: nowrap; font-family: var(--font-m); }
 .rname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rmeta { color: var(--muted); font-size: 12px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
