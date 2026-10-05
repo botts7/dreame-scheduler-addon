@@ -384,6 +384,23 @@ def api_clean_segments():
         return jsonify(body), code
 
 
+@app.route("/api/ha/clean_zone", methods=["POST"])
+def api_clean_zone():
+    """Edge clean: zone-clean a list of rectangles [x0,y0,x1,y1] in one task."""
+    cfg = ha_bridge.config_from_env()
+    payload = request.get_json(silent=True) or {}
+    ve = (payload.get("vacuum_entity") or "").strip()
+    zones = payload.get("zones")
+    if not ve or not isinstance(zones, list) or not zones:
+        return jsonify({"error": "bad_request", "detail": "vacuum_entity, zones[] required"}), 400
+    try:
+        ha_bridge.clean_zones(cfg, ve, zones, repeats=int(payload.get("repeats", 1)))
+        return jsonify({"ok": True, "count": len(zones)})
+    except Exception as e:  # noqa: BLE001
+        body, code = _ha_error(e)
+        return jsonify(body), code
+
+
 @app.route("/api/ha/apply_segment_ops", methods=["POST"])
 def api_apply_segment_ops():
     """Apply a staged batch of segment edits (split/merge/rename) to the robot

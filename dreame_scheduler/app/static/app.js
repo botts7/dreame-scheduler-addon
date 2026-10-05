@@ -328,8 +328,10 @@ function renderRooms() {
       <label><span>Mode</span>${optSelectHTML("mode", CFG.modes, rc.mode)}</label>
       <label><span>Suction</span>${optSelectHTML("suction", CFG.suctions, rc.suction)}</label>
       <label><span>Mop wetness <em>(blank = default)</em></span><input type="text" data-f="wetness" value="${esc(rc.wetness ?? "")}"></label>
+      <label><span>Mop cadence</span>${mopEverySelectHTML(rc.mop_every)}</label>
       <label><span>Passes</span><input type="number" min="1" max="3" data-f="repeats" value="${esc(rc.repeats || 1)}"></label>
       <label><span>Door sensor <em>(skip when shut)</em></span>${doorSelectHTML(doorSensors, rc.door_sensor)}</label>
+      <div class="wide times-editor" data-times-editor><span>Extra times <em>(clean this room more than once a day; blank = just the daily time)</em></span></div>
     </div>`;
     extra.appendChild(td); tbody.appendChild(extra);
 
@@ -340,15 +342,81 @@ function renderRooms() {
     });
     // bind extra inputs
     const sels = $$("select[data-f]", td), inps = $$("input[data-f]", td);
-    sels.forEach(s => s.addEventListener("change", () => { rc[s.dataset.f] = s.value; }));
+    sels.forEach(s => s.addEventListener("change", () => {
+      rc[s.dataset.f] = s.dataset.f === "mop_every" ? Number(s.value) : s.value;
+    }));
     inps.forEach(inp => inp.addEventListener("change", () => {
       rc[inp.dataset.f] = inp.dataset.f === "repeats" ? Number(inp.value) : inp.value;
     }));
+    // Extra times: a repeatable list of time rows + a per-time "vacuum only" toggle.
+    const teHost = $("[data-times-editor]", td);
+    if (teHost) buildTimesEditor(teHost, rc);
   });
 
   if (!Object.keys(rooms).length) {
     tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px">No rooms found yet — let the vacuum finish a full map, then reload.</td></tr>`;
   }
+}
+
+// Extra per-room clean times: a repeatable list of {at:"HH:MM", mop:bool} rows.
+// A row with "vacuum only" ticked stores mop:false (a sweep-only pass). Empty/
+// invalid rows are pruned on save (see collectRoomTimes). This is the shape the
+// integration's scheduler.room_times expects.
+function buildTimesEditor(host, rc) {
+  const label = host.querySelector("span") ? host.querySelector("span").outerHTML
+    : `<span>Extra times <em>(clean this room more than once a day)</em></span>`;
+  const draw = () => {
+    const times = Array.isArray(rc.times) ? rc.times : [];
+    host.innerHTML = label +
+      `<div class="time-rows">` + times.map((t, i) => `
+        <div class="time-row" data-i="${i}">
+          <input type="time" data-time value="${esc(t.at || "")}">
+          <label class="vac"><input type="checkbox" data-vac${t.mop === false ? " checked" : ""}> vacuum only</label>
+          <button type="button" class="time-rm" data-remove aria-label="Remove this time" title="Remove">&times;</button>
+        </div>`).join("") + `</div>` +
+      `<button type="button" class="time-add" data-add>+ Add time</button>`;
+
+    host.querySelector("[data-add]").addEventListener("click", () => {
+      rc.times = (Array.isArray(rc.times) ? rc.times : []).concat([{ at: "", mop: true }]);
+      draw();
+    });
+    $$(".time-row", host).forEach(row => {
+      const i = +row.dataset.i;
+      row.querySelector("[data-time]").addEventListener("change", e => { rc.times[i].at = e.target.value; });
+      row.querySelector("[data-vac]").addEventListener("change", e => { rc.times[i].mop = !e.target.checked; });
+      row.querySelector("[data-remove]").addEventListener("click", () => {
+        rc.times.splice(i, 1);
+        if (!rc.times.length) delete rc.times;
+        draw();
+      });
+    });
+  };
+  draw();
+}
+
+// Drop empty/invalid time rows and de-dup by time before saving; returns a clean
+// list (or undefined when there are none, so the room falls back to the daily time).
+function collectRoomTimes(times) {
+  const seen = {};
+  (Array.isArray(times) ? times : []).forEach(t => {
+    if (t && /^\d{2}:\d{2}$/.test(t.at || "")) seen[t.at] = { at: t.at, mop: t.mop !== false };
+  });
+  const keys = Object.keys(seen).sort();
+  return keys.length ? keys.map(k => seen[k]) : undefined;
+}
+
+// Per-room mop cadence: 0 = never mop (all-rug room), 1 = every clean, 2..7 = every Nth.
+// Mirrors the HA config-flow dropdown so both surfaces set the same option.
+function mopEverySelectHTML(selected) {
+  const opts = [
+    [0, "Never — sweep only (all-rug room)"], [1, "Every clean"],
+    [2, "Every 2nd clean"], [3, "Every 3rd clean"], [4, "Every 4th clean"],
+    [5, "Every 5th clean"], [6, "Every 6th clean"], [7, "Every 7th clean"],
+  ];
+  const cur = (selected === undefined || selected === null || selected === "") ? 1 : Number(selected);
+  return `<select data-f="mop_every">` +
+    opts.map(([v, l]) => `<option value="${v}"${cur === v ? " selected" : ""}>${esc(l)}</option>`).join("") +
+    `</select>`;
 }
 
 function optSelectHTML(field, items, selected) {
@@ -365,6 +433,13 @@ function doorSelectHTML(items, selected) {
 async function save() {
   const btn = $("#save"); btn.disabled = true; setStatus("Saving…");
   try {
+    // Prune empty/invalid extra-time rows per room (drop the key entirely when none).
+    Object.values(OPTS.rooms || {}).forEach(rc => {
+      if (rc && "times" in rc) {
+        const t = collectRoomTimes(rc.times);
+        if (t) rc.times = t; else delete rc.times;
+      }
+    });
     await api("api/ha/config", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ options: OPTS }),
@@ -554,6 +629,46 @@ let DEVDRAG = null;                                 // dragging a placed pin {ei
 let DEV_FILTER = null;                              // null = show all placed pins; else Set of domains to show
 let CLEAN_MODE = false;                             // tap rooms to send the robot to clean them
 const CLEAN_SEL = new Set();                        // selected room segs for cleaning
+const EDGE_STRIP_MM = 250;                          // width of each wall strip (~robot width, ~one pass)
+
+// Thin rectangles hugging a room's four walls (from its map box), for an edge
+// pass via clean_zone. Clipped to the room, and never wider than half the room.
+function edgeStripsForRoom(seg) {
+  const r = MAP && MAP.byId && MAP.byId[seg];
+  if (!r) return [];
+  const x0 = Math.min(r.x0, r.x1), x1 = Math.max(r.x0, r.x1);
+  const y0 = Math.min(r.y0, r.y1), y1 = Math.max(r.y0, r.y1);
+  const w = Math.max(60, Math.min(EDGE_STRIP_MM, (x1 - x0) / 2, (y1 - y0) / 2));
+  return [
+    [x0, y0, x0 + w, y1],     // one wall
+    [x1 - w, y0, x1, y1],     // opposite wall
+    [x0, y0, x1, y0 + w],     // third wall
+    [x0, y1 - w, x1, y1],     // fourth wall
+  ].map(z => z.map(Math.round));
+}
+
+async function edgeCleanRoom(seg, name) {
+  const strips = edgeStripsForRoom(seg);
+  if (!strips.length) { alert("No map geometry for " + name + " yet."); return; }
+  if (!(await uiConfirm({
+    title: "Edge clean " + name + "?",
+    message: "Sends the robot around the walls of " + name + " — thin strips along each edge.\n\n"
+      + "Beta / Phase 1: it also cleans the 'invisible' room-boundary edges (open doorways / where the "
+      + "map splits rooms), not only physical walls. For an edges-only pass, set the robot to Vacuum and "
+      + "turn Auto-reclean off first — otherwise it may fill the whole room after the edges.",
+    confirmText: "Edge clean",
+  }))) return;
+  const ve = (MAP && MAP.m && MAP.m.vacuum_entity) || (CFG && CFG.prefix ? "vacuum." + CFG.prefix : "");
+  try {
+    await api("api/ha/clean_zone", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vacuum_entity: ve, zones: strips }),
+    });
+    setStatus("Edge cleaning " + name + " ✓", "ok");
+  } catch (e) {
+    setStatus("Edge clean failed: " + (e && e.message ? e.message : e), "err");
+  }
+}
 const DEV_STATE = {};                               // eid -> {name,domain,state,device_class}
 const _devices = () => { const o = _mapImgCfg(); return o.devices || (o.devices = {}); };  // eid -> {x,y}
 const DEV_ICONS = { light: "💡", switch: "🔌", fan: "🌀", cover: "🪟", lock: "🔒", climate: "🌡️", media_player: "🔊", sensor: "📊", binary_sensor: "🟢", vacuum: "🧹", camera: "📷", scene: "🎬", script: "📜", button: "⏺️", person: "🧑", device_tracker: "📍", input_boolean: "☑️", automation: "⚙️", number: "🔢", select: "🎚️", climate_: "🌡️" };
@@ -1558,6 +1673,7 @@ function _mapCtxItems(e, svg) {
         api("api/ha/clean_segments", { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ segments: [parseInt(seg, 10)] }) }).catch(err => alert("Failed: " + err.message));
     } });
+    items.push({ icon: "🧭", label: "Edge clean " + name + " (beta)", on: () => edgeCleanRoom(seg, name) });
   }
   if (items.length) items.push({ sep: true });
   // tool modes (mirrors the toolbar; clicking keeps toolbar state in sync)

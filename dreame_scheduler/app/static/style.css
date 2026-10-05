@@ -207,7 +207,19 @@ select[multiple] { min-height: 96px; }
 .room-extra .grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .room-extra .grid label > span { color: var(--muted); }
 .room-extra .grid label em { font-style: normal; opacity: .7; }
+.room-extra .grid label.wide, .room-extra .grid .wide { grid-column: 1 / -1; }
 .room-extra select, .room-extra input { max-width: none; width: 100%; padding: 6px 8px; background: var(--card); }
+/* Extra-times editor: repeatable rows of [time] [vacuum-only] [remove]. */
+.times-editor { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.times-editor > span { color: var(--muted); }
+.times-editor .time-rows { display: flex; flex-direction: column; gap: 6px; }
+.times-editor .time-row { display: flex; align-items: center; gap: 10px; }
+.times-editor .time-row input[type="time"] { width: auto; flex: 0 0 auto; }
+.times-editor .time-row .vac { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--fg); }
+.times-editor .time-row .vac input { width: auto; }
+.times-editor .time-rm { margin-left: auto; flex: 0 0 auto; width: 28px; padding: 4px 0; line-height: 1; cursor: pointer; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); }
+.times-editor .time-rm:hover { color: var(--fg); }
+.times-editor .time-add { align-self: flex-start; padding: 5px 10px; cursor: pointer; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: inherit; }
 
 /* ------------------------------------------------ map tab: toolbar */
 .beta-tag { font-size: 8.5px; background: var(--amber-soft); color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); border-radius: 5px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; font-family: var(--font-m); }

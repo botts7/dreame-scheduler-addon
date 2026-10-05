@@ -52,7 +52,7 @@ def _safe_entity(entity_id: str) -> str:
 _PICKER_DOMAINS = ("person", "device_tracker", "group", "binary_sensor")
 
 _ACTIONS = ("run_scheduled_now", "run_catchup_now", "reset_week",
-            "apply_learned_nogo", "show_unreachable")
+            "apply_learned_nogo", "show_unreachable", "edge_clean")
 
 
 @dataclass(frozen=True)
@@ -458,6 +458,47 @@ def clean_segments(cfg: CoreConfig, vacuum_entity: str, segments, timeout: float
         raise CoreUnavailable(str(e)) from e
     if r.status_code >= 400:
         raise CoreError(f"clean_rooms HTTP {r.status_code}: {r.text[:200]}")
+
+
+# Upper bound on zones we'll hand the robot in one clean_zone task. A generous
+# safety cap only — the real per-task limit is the robot firmware's (unknown
+# until tested), and the Edge-clean UI batches/limits well under this.
+MAX_CLEAN_ZONES = 32
+
+
+def clean_zones(cfg: CoreConfig, vacuum_entity: str, zones, repeats: int = 1,
+                timeout: float = 15.0) -> None:
+    """Zone-clean a list of axis-aligned rectangles [x0,y0,x1,y1] in ONE task —
+    used by Edge clean (thin strips hugging the walls). Calls the robot's own
+    vacuum_clean_zone directly; note a later clean_zone REPLACES this task, so all
+    the strips for one pass must come in a single call (hence the firmware zone
+    cap matters)."""
+    _ensure(cfg)
+    ve = _safe_entity(vacuum_entity)
+    if ve.split(".", 1)[0] != "vacuum":
+        raise CoreError(f"{ve} is not a vacuum entity")
+    rects: list[list[int]] = []
+    for z in (zones or []):
+        if not (isinstance(z, (list, tuple)) and len(z) == 4):
+            raise CoreError("each zone must be [x0,y0,x1,y1]")
+        x0, y0, x1, y1 = (int(round(float(v))) for v in z)
+        rects.append([min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)])
+    if not rects:
+        raise CoreError("no zones")
+    if len(rects) > MAX_CLEAN_ZONES:
+        raise CoreError(f"too many zones ({len(rects)} > {MAX_CLEAN_ZONES})")
+    rp = max(1, min(3, int(repeats)))
+    try:
+        r = requests.post(
+            f"{cfg.base_url}/services/dreame_vacuum/vacuum_clean_zone",
+            headers=_headers(cfg),
+            json={"entity_id": ve, "zone": rects, "repeats": rp},
+            timeout=timeout,
+        )
+    except requests.RequestException as e:
+        raise CoreUnavailable(str(e)) from e
+    if r.status_code >= 400:
+        raise CoreError(f"clean_zone HTTP {r.status_code}: {r.text[:200]}")
 
 
 def _rooms_snapshot(cfg: CoreConfig, prefix: str) -> dict:
